@@ -14,25 +14,24 @@ html,body{
   overflow:hidden; overscroll-behavior:none; touch-action:none;
   -webkit-user-select:none; user-select:none;
 }
-/* 映像はcanvasに描き直すが、Safari等でデコードが止まらないよう実サイズで残す */
 #vid{position:fixed; inset:0; width:100%; height:100%; object-fit:cover; opacity:.002; pointer-events:none; z-index:1;}
 #hud{position:fixed; inset:0; display:block; z-index:10;}
 
 #bar{
   position:fixed; z-index:20;
-  right:calc(env(safe-area-inset-right) + 14px);
-  bottom:calc(env(safe-area-inset-bottom) + 14px);
-  display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  right:calc(env(safe-area-inset-right) + 12px);
+  bottom:calc(env(safe-area-inset-bottom) + 12px);
+  display:flex; flex-direction:column; gap:7px; align-items:flex-end;
   opacity:0; transition:opacity .5s ease .3s;
 }
 #bar.on{opacity:1;}
 .btn{
   appearance:none; cursor:pointer;
-  font:600 10px/1 var(--mono); letter-spacing:.16em;
+  font:600 10px/1 var(--mono); letter-spacing:.14em;
   color:var(--cy); text-transform:uppercase;
-  background:rgba(4,20,28,.55);
+  background:rgba(4,20,28,.5);
   border:1px solid var(--cy-dim);
-  padding:9px 11px; border-radius:2px;
+  padding:8px 10px; border-radius:2px;
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   transition:background .15s, border-color .15s, color .15s;
 }
