@@ -1,0 +1,89 @@
+:root{
+  --cy:#6fe6ff;
+  --cy-dim:rgba(111,230,255,.34);
+  --am:#ffb13b;
+  --rd:#ff4f45;
+  --void:#04090e;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0; padding:0; height:100%; width:100%;
+  background:var(--void); color:var(--cy);
+  font-family:var(--mono);
+  overflow:hidden; overscroll-behavior:none; touch-action:none;
+  -webkit-user-select:none; user-select:none;
+}
+/* 映像はcanvasに描き直すが、Safari等でデコードが止まらないよう実サイズで残す */
+#vid{position:fixed; inset:0; width:100%; height:100%; object-fit:cover; opacity:.002; pointer-events:none; z-index:1;}
+#hud{position:fixed; inset:0; display:block; z-index:10;}
+
+#bar{
+  position:fixed; z-index:20;
+  right:calc(env(safe-area-inset-right) + 14px);
+  bottom:calc(env(safe-area-inset-bottom) + 14px);
+  display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  opacity:0; transition:opacity .5s ease .3s;
+}
+#bar.on{opacity:1;}
+.btn{
+  appearance:none; cursor:pointer;
+  font:600 10px/1 var(--mono); letter-spacing:.16em;
+  color:var(--cy); text-transform:uppercase;
+  background:rgba(4,20,28,.55);
+  border:1px solid var(--cy-dim);
+  padding:9px 11px; border-radius:2px;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  transition:background .15s, border-color .15s, color .15s;
+}
+.btn:hover{background:rgba(111,230,255,.14); border-color:var(--cy);}
+.btn:active{background:rgba(111,230,255,.3); color:#04121a;}
+.btn:focus-visible{outline:2px solid var(--am); outline-offset:2px;}
+.btn[data-off="1"]{color:rgba(111,230,255,.4); border-color:rgba(111,230,255,.16);}
+
+#gate{
+  position:fixed; inset:0; z-index:30;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
+  background:radial-gradient(120% 90% at 50% 45%, #07161f 0%, #04090e 62%, #02060a 100%);
+  padding:24px; text-align:center;
+}
+#gate.gone{display:none;}
+#core{
+  width:118px; height:118px; border-radius:50%; position:relative;
+  display:grid; place-items:center; cursor:pointer; flex:none;
+}
+#core::before,#core::after{
+  content:""; position:absolute; border-radius:50%; border:1px solid var(--cy-dim);
+}
+#core::before{inset:0; border-top-color:var(--cy); border-right-color:transparent; animation:spin 3.4s linear infinite;}
+#core::after{inset:16px; border-bottom-color:var(--cy); border-left-color:transparent; animation:spin 2.1s linear reverse infinite;}
+#core span{
+  width:52px; height:52px; border-radius:50%;
+  background:radial-gradient(circle, #dffaff 0%, var(--cy) 42%, rgba(111,230,255,.05) 72%);
+  box-shadow:0 0 30px rgba(111,230,255,.55), 0 0 70px rgba(111,230,255,.22);
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.72; transform:scale(.94)} 50%{opacity:1; transform:scale(1.04)}}
+#gate h1{
+  margin:0; font-size:clamp(15px,4.4vw,20px); font-weight:700;
+  letter-spacing:.44em; text-indent:.44em; color:#dff7ff;
+}
+#gate p{
+  margin:0; max-width:34ch; font-size:11px; line-height:1.85;
+  letter-spacing:.1em; color:rgba(111,230,255,.62);
+}
+#gate .cta{padding:13px 22px; font-size:11px; letter-spacing:.24em;}
+#err{
+  display:none; max-width:36ch; font-size:11px; line-height:1.8; letter-spacing:.06em;
+  color:var(--rd); border:1px solid rgba(255,79,69,.4); padding:12px 14px; background:rgba(255,79,69,.07);
+}
+#err.on{display:block;}
+#flash{
+  position:fixed; inset:0; z-index:25; background:#dff7ff; opacity:0; pointer-events:none;
+  transition:opacity .42s ease-out;
+}
+#flash.on{opacity:.85; transition:none;}
+@media (prefers-reduced-motion: reduce){
+  #core::before,#core::after,#core span{animation:none;}
+}
