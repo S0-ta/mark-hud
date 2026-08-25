@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#04090E">
+<title>MARK HUD</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<video id="vid" playsinline muted autoplay></video>
+<canvas id="hud"></canvas>
+<div id="flash"></div>
+
+<div id="bar">
+  <button class="btn" id="bSwap">カメラ切替</button>
+  <button class="btn" id="bSnap">静止画保存</button>
+  <button class="btn" id="bSound">音 ON</button>
+  <button class="btn" id="bFull">全画面</button>
+  <button class="btn" id="bStop">停止</button>
+</div>
+
+<div id="gate">
+  <div id="core"><span></span></div>
+  <h1>MARK HUD</h1>
+  <p>カメラ映像にヘルメット内側の表示を重ねます。動いたものを自動でロックします。映像は端末内だけで処理され、どこにも送信されません。</p>
+  <button class="btn cta" id="bStart">起動する</button>
+  <div id="err"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
