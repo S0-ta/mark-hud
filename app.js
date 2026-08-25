@@ -536,26 +536,261 @@ function drawMotionTargets(e){
   ctx.restore();
 }
 
-/* ================= 描画：HUD ================= */
+/* ================= 描画：ヘルメット内部UI ================= */
+
+function chamferBox(x, y, w, h, c){
+  ctx.beginPath();
+  ctx.moveTo(x+c, y);
+  ctx.lineTo(x+w, y);
+  ctx.lineTo(x+w, y+h-c);
+  ctx.lineTo(x+w-c, y+h);
+  ctx.lineTo(x, y+h);
+  ctx.lineTo(x, y+c);
+  ctx.closePath();
+}
+
+/* 左右の同心アーク：ヘルメット内壁の曲率を表現 */
+function drawSideArcs(e){
+  const cyy = H*0.5;
+  const sets = [ {ccx:-W*0.62, base:0}, {ccx:W+W*0.62, base:Math.PI} ];
+  ctx.save();
+  for(const s of sets){
+    for(let i=0;i<3;i++){
+      const r = W*(0.74 + i*0.075);
+      ctx.globalAlpha = e*(0.34 - i*0.09);
+      ctx.strokeStyle = CY;
+      ctx.lineWidth = i===1 ? 1.4 : 0.9;
+      ctx.beginPath();
+      ctx.arc(s.ccx, cyy, r, s.base-0.95, s.base+0.95);
+      ctx.stroke();
+    }
+    const r = W*0.815;
+    ctx.strokeStyle = CY; ctx.lineWidth = 1;
+    let k = 0;
+    for(let a = -0.9; a <= 0.9; a += 0.075, k++){
+      const ang = s.base + a;
+      const major = k % 4 === 0;
+      const len = major ? 12 : 7;
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      ctx.globalAlpha = e*(major?0.55:0.28);
+      ctx.beginPath();
+      ctx.moveTo(s.ccx + dx*r, cyy + dy*r);
+      ctx.lineTo(s.ccx + dx*(r-len), cyy + dy*(r-len));
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/* 下部の大アーク：セグメントゲージ */
+function drawBottomArc(e){
+  const ccx = W/2, ccy = H + H*0.30, R = H*0.44;
+  const c0 = -Math.PI/2;
+  ctx.save();
+  ctx.globalAlpha = e*0.35;
+  ctx.strokeStyle = CY; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(ccx, ccy, R, c0-0.85, c0+0.85); ctx.stroke();
+  ctx.globalAlpha = e*0.16;
+  ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.arc(ccx, ccy, R+14, c0-0.8, c0+0.8); ctx.stroke();
+
+  let i = 0;
+  const sweep = Math.sin(S.t*0.55)*0.8;
+  for(let a = -0.82; a <= 0.82; a += 0.041, i++){
+    const ang = c0 + a;
+    const major = i % 5 === 0;
+    const near = Math.abs(a - sweep) < 0.05;
+    const len = near ? 16 : (major ? 11 : 6);
+    ctx.globalAlpha = e*(near ? 0.95 : major ? 0.55 : 0.26);
+    ctx.strokeStyle = near ? AM : CY;
+    ctx.lineWidth = near ? 2 : 1;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(ccx+dx*R, ccy+dy*R);
+    ctx.lineTo(ccx+dx*(R+len), ccy+dy*(R+len));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/* 上部の方位ルーラー */
+function drawTopRuler(e, y){
+  const halfW = Math.min(W*0.36, 210);
+  const cx = W/2;
+  const hd = S.headingLive ? S.heading : (S.t*6)%360;
+  const names = {0:'N',90:'E',180:'S',270:'W'};
+  ctx.save(); ctx.globalAlpha = e*0.9;
+  ctx.strokeStyle = 'rgba(111,230,255,.28)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx-halfW, y); ctx.lineTo(cx+halfW, y); ctx.stroke();
+  ctx.textAlign = 'center';
+  for(let a = -60; a <= 60; a += 10){
+    const deg = (Math.round(hd/10)*10 + a + 360) % 360;
+    const off = (deg - hd + 540) % 360 - 180;
+    if(Math.abs(off) > 62) continue;
+    const x = cx + off/60*halfW;
+    const major = deg % 30 === 0;
+    ctx.strokeStyle = 'rgba(111,230,255,'+(major?0.6:0.26)+')';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y+(major?8:5)); ctx.stroke();
+    if(major){
+      font(8, names[deg]?'700':'400');
+      ctx.fillStyle = names[deg] ? '#dff7ff' : 'rgba(111,230,255,.5)';
+      ctx.fillText(names[deg] || deg, x, y+18);
+    }
+  }
+  ctx.fillStyle = AM;
+  ctx.beginPath(); ctx.moveTo(cx,y+1); ctx.lineTo(cx-5,y-6); ctx.lineTo(cx+5,y-6); ctx.closePath(); ctx.fill();
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+/* フェイスプレート状態ウィジェット */
+function drawFaceplate(e, x, y, w, h){
+  ctx.save();
+  ctx.globalAlpha = e*0.75;
+  ctx.strokeStyle = 'rgba(111,230,255,.45)'; ctx.lineWidth = 1;
+  chamferBox(x, y, w, h, 9); ctx.stroke();
+  ctx.fillStyle = 'rgba(4,20,30,.35)'; ctx.fill();
+
+  const cx = x + w/2, cy = y + h*0.52;
+  const s = Math.min(w, h) * 0.34;
+  const tilt = Math.sin(S.t*0.6) * 0.07;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(tilt);
+  ctx.globalAlpha = e;
+  ctx.strokeStyle = CY; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-s*0.86, -s*0.95);
+  ctx.lineTo( s*0.86, -s*0.95);
+  ctx.lineTo( s*0.95, -s*0.10);
+  ctx.lineTo( s*0.52,  s*0.82);
+  ctx.lineTo(-s*0.52,  s*0.82);
+  ctx.lineTo(-s*0.95, -s*0.10);
+  ctx.closePath(); ctx.stroke();
+  ctx.globalAlpha = e*0.45;
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(0,-s*0.95); ctx.lineTo(0, s*0.82);
+  ctx.moveTo(-s*0.9, s*0.16); ctx.lineTo(s*0.9, s*0.16);
+  ctx.moveTo(-s*0.7, s*0.5); ctx.lineTo(s*0.7, s*0.5);
+  ctx.stroke();
+  ctx.globalAlpha = e*(0.7 + 0.3*Math.abs(Math.sin(S.t*1.6)));
+  ctx.fillStyle = AM;
+  [-1, 1].forEach(sg=>{
+    ctx.beginPath();
+    ctx.moveTo(sg*s*0.18, -s*0.36);
+    ctx.lineTo(sg*s*0.76, -s*0.46);
+    ctx.lineTo(sg*s*0.74, -s*0.20);
+    ctx.lineTo(sg*s*0.18, -s*0.16);
+    ctx.closePath(); ctx.fill();
+  });
+  ctx.restore();
+
+  ctx.globalAlpha = e;
+  font(7,'600'); ctx.fillStyle = 'rgba(111,230,255,.6)';
+  ctx.fillText('装甲状態', x+7, y+13);
+  font(8,'700'); ctx.fillStyle = AM;
+  ctx.textAlign = 'right';
+  ctx.fillText('100%', x+w-7, y+13);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+/* 円形ダイヤル */
+function drawDial(e, cx, cy, r, label, value){
+  ctx.save();
+  ctx.globalAlpha = e*0.5;
+  ctx.strokeStyle = CY; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.284); ctx.stroke();
+  ctx.globalAlpha = e*0.22;
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.72, 0, 6.284); ctx.stroke();
+  for(let i=0;i<24;i++){
+    const a = i/24*6.284;
+    const major = i%6===0;
+    ctx.globalAlpha = e*(major?0.6:0.25);
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+    ctx.lineTo(cx+Math.cos(a)*(r-(major?7:4)), cy+Math.sin(a)*(r-(major?7:4)));
+    ctx.stroke();
+  }
+  const ang = REDUCED ? -Math.PI/2 : S.t*1.1;
+  ctx.globalAlpha = e*0.9;
+  ctx.strokeStyle = AM; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+Math.cos(ang)*r*0.66, cy+Math.sin(ang)*r*0.66); ctx.stroke();
+  ctx.globalAlpha = e;
+  font(7,'500'); ctx.fillStyle = 'rgba(111,230,255,.55)';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, cx, cy+r+11);
+  font(8,'700'); ctx.fillStyle = CY;
+  ctx.fillText(value, cx, cy+r+21);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+/* システムログ */
+const LOG_POOL = [
+  'OPTICAL FEED  SYNC',
+  'MESH SOLVER  ACTIVE',
+  'TRACK BUFFER  OK',
+  'THERMAL  NOMINAL',
+  'REPULSOR  STANDBY',
+  'GYRO CAL  DONE',
+  'DEPTH EST  RUNNING',
+  'LINK  SECURE'
+];
+let logLines = [], logT = 0, logIdx = 0;
+function updateLog(dt){
+  logT += dt;
+  if(logT > 1.1){
+    logT = 0;
+    logLines.push({ s: LOG_POOL[logIdx++ % LOG_POOL.length], a: 0 });
+    if(logLines.length > 4) logLines.shift();
+  }
+  for(const l of logLines) l.a = Math.min(1, l.a + dt*4);
+}
+function drawLog(e, x, yBottom){
+  ctx.save();
+  logLines.forEach((l,i)=>{
+    const y = yBottom - (logLines.length-1-i)*12;
+    ctx.globalAlpha = e*l.a*(0.35 + 0.65*(i+1)/logLines.length);
+    font(7,'500'); ctx.fillStyle = CY;
+    ctx.fillText('› '+l.s, x, y);
+  });
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/* 中央レティクル */
 function drawReticle(e){
   const cx = W/2, cy = H/2;
-  const R = Math.min(W,H)*0.13*(0.6+0.4*e);
+  const R = Math.min(W,H)*0.145*(0.6+0.4*e);
   const spin = REDUCED ? 0 : S.t;
   ctx.save();
-  ctx.globalAlpha = e*0.9;
+  ctx.globalAlpha = e*0.85;
   ctx.translate(cx,cy);
 
-  ctx.strokeStyle = 'rgba(111,230,255,.6)'; ctx.lineWidth = 1.3;
+  ctx.strokeStyle = 'rgba(111,230,255,.55)'; ctx.lineWidth = 1.2;
   ctx.save(); ctx.rotate(spin*0.5);
   for(let i=0;i<4;i++){
     ctx.beginPath();
-    ctx.arc(0,0,R, i*Math.PI/2 + 0.22, i*Math.PI/2 + Math.PI/2 - 0.22);
+    ctx.arc(0,0,R, i*Math.PI/2 + 0.24, i*Math.PI/2 + Math.PI/2 - 0.24);
     ctx.stroke();
   }
   ctx.restore();
 
-  ctx.strokeStyle = 'rgba(111,230,255,.45)'; ctx.lineWidth = 1.1;
-  const g0 = R*0.2, g1 = R*0.55;
+  ctx.strokeStyle = 'rgba(111,230,255,.3)'; ctx.lineWidth = 1;
+  ctx.save(); ctx.rotate(-spin*0.3);
+  for(let i=0;i<3;i++){
+    ctx.beginPath();
+    ctx.arc(0,0,R*0.72, i*2.094, i*2.094 + 1.15);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(111,230,255,.5)'; ctx.lineWidth = 1.1;
+  const g0 = R*0.24, g1 = R*0.58;
   [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
     ctx.beginPath(); ctx.moveTo(dx*g0, dy*g0); ctx.lineTo(dx*g1, dy*g1); ctx.stroke();
   });
@@ -572,42 +807,41 @@ function drawReticle(e){
   ctx.textAlign = 'center';
   ctx.globalAlpha = e;
   ctx.fillStyle = col;
-  ctx.fillText(msg, cx, cy + R*1.8);
+  ctx.fillText(msg, cx, cy + R*1.9);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
 }
 
+/* 上段テキスト */
 function drawTop(e){
-  const y = Math.max(26, H*0.045) - (1-e)*24;
-  const m = Math.max(24, W*0.05);
+  const y = Math.max(24, H*0.04) - (1-e)*24;
+  const m = Math.max(22, W*0.045);
   ctx.save(); ctx.globalAlpha = e;
   font(10,'700'); ctx.fillStyle = CY;
   ctx.fillText('J.A.R.V.I.S.', m, y);
-  font(8,'400'); ctx.fillStyle = 'rgba(111,230,255,.55)';
-  ctx.fillText('MARK  LXXXV  /  顔認識モード', m, y+13);
+  font(7,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
+  ctx.fillText('MARK LXXXV / 顔認識モード', m, y+12);
 
   const d = new Date();
-  font(11,'600'); ctx.textAlign = 'center'; ctx.fillStyle = '#dff7ff';
-  ctx.fillText(pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()), W/2, y);
-  font(8,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
-  ctx.fillText('経過 '+pad(S.t/60)+':'+pad(S.t%60), W/2, y+13);
-
   ctx.textAlign = 'right';
-  font(9,'600'); ctx.fillStyle = CY;
+  font(10,'600'); ctx.fillStyle = '#dff7ff';
+  ctx.fillText(pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()), W-m, y);
+  font(7,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
   const bt = S.battery ? Math.round(S.battery.level*100)+'%' : '—';
-  ctx.fillText('電源 '+bt, W-m, y);
-  font(8,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
-  ctx.fillText(Math.round(S.fps)+' FPS   '+(V.videoWidth||0)+'×'+(V.videoHeight||0), W-m, y+13);
+  ctx.fillText('電源 '+bt+'   '+Math.round(S.fps)+'FPS', W-m, y+12);
   ctx.textAlign = 'left';
   ctx.restore();
+
+  drawTopRuler(e, y+30);
 }
 
+/* 左：出力バー＋状態 */
 function drawLeft(e){
-  const m = Math.max(24, W*0.05) - (1-e)*40;
-  const top = H*0.3, h = H*0.34;
+  const m = Math.max(20, W*0.042) - (1-e)*40;
+  const top = H*0.32, h = H*0.26;
   ctx.save(); ctx.globalAlpha = e;
 
-  const segs = 16, sh = h/segs;
+  const segs = 14, sh = h/segs;
   const power = 0.62 + 0.3*Math.abs(Math.sin(S.t*0.5));
   for(let i=0;i<segs;i++){
     const on = (segs-i)/segs <= clamp(power,0,1);
@@ -616,7 +850,6 @@ function drawLeft(e){
     ctx.fillRect(m, top+i*sh, 4, sh-3);
   }
   ctx.globalAlpha = e;
-
   const faceLabel = S.faceState==='ready' ? '稼働'
                   : S.faceState==='loading' ? '読込中'
                   : S.faceState==='error' ? '不可' : '待機';
@@ -624,51 +857,60 @@ function drawLeft(e){
     ['顔認識', faceLabel],
     ['検出数', faces.length+' 人'],
     ['特徴点', faces.length? faces[0].lm.length : 0],
-    ['カメラ', mirrored()?'前面':'背面'],
-    ['動体', S.tracks.length]
+    ['カメラ', mirrored()?'前面':'背面']
   ];
-  const ry = top+h+22;
+  const ry = top+h+18;
   rows.forEach((r,i)=>{
-    font(8,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
-    ctx.fillText(r[0], m, ry+i*14);
-    font(8,'600');
+    font(7,'400'); ctx.fillStyle = 'rgba(111,230,255,.5)';
+    ctx.fillText(r[0], m, ry+i*13);
+    font(7,'700');
     ctx.fillStyle = (i===0 && S.faceState==='error') ? RD : CY;
-    ctx.fillText(String(r[1]), m+56, ry+i*14);
+    ctx.fillText(String(r[1]), m+50, ry+i*13);
   });
   ctx.restore();
 }
 
-function drawCompass(e){
-  const y = H - Math.max(30, H*0.05) + (1-e)*30;
-  const halfW = Math.min(W*0.32, 190);
-  const cx = W/2;
-  const hd = S.headingLive ? S.heading : (S.t*6)%360;
+/* 右：高度ラダー */
+function drawRight(e){
+  const m = W - Math.max(20, W*0.042) + (1-e)*40;
+  const cy = H*0.44, half = H*0.15;
   ctx.save(); ctx.globalAlpha = e*0.9;
+  ctx.textAlign = 'right';
+  const base = 120 + Math.sin(S.t*0.4)*18;
   ctx.strokeStyle = 'rgba(111,230,255,.3)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(cx-halfW, y); ctx.lineTo(cx+halfW, y); ctx.stroke();
-
-  const names = {0:'北',90:'東',180:'南',270:'西'};
-  ctx.textAlign = 'center';
-  for(let a = -60; a <= 60; a += 10){
-    const deg = (Math.round(hd/10)*10 + a + 360) % 360;
-    const off = (deg - hd + 540) % 360 - 180;
-    if(Math.abs(off) > 62) continue;
-    const x = cx + off/60*halfW;
-    const major = deg % 30 === 0;
-    ctx.strokeStyle = 'rgba(111,230,255,'+(major?0.6:0.28)+')';
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y-(major?8:5)); ctx.stroke();
-    if(major){
-      font(8, names[deg]?'700':'400');
-      ctx.fillStyle = names[deg] ? '#dff7ff' : 'rgba(111,230,255,.5)';
-      ctx.fillText(names[deg] || deg, x, y+12);
-    }
+  ctx.beginPath(); ctx.moveTo(m, cy-half); ctx.lineTo(m, cy+half); ctx.stroke();
+  for(let i=-4;i<=4;i++){
+    const val = Math.round((base + i*10)/10)*10;
+    const yy = cy - (val - base)*(half/45);
+    if(yy < cy-half || yy > cy+half) continue;
+    const major = val % 20 === 0;
+    ctx.strokeStyle = 'rgba(111,230,255,'+(major?0.55:0.24)+')';
+    ctx.beginPath(); ctx.moveTo(m, yy); ctx.lineTo(m-(major?12:7), yy); ctx.stroke();
+    if(major){ font(7,'400'); ctx.fillStyle='rgba(111,230,255,.5)'; ctx.fillText(String(val), m-16, yy+3); }
   }
   ctx.fillStyle = AM;
-  ctx.beginPath(); ctx.moveTo(cx,y-12); ctx.lineTo(cx-5,y-19); ctx.lineTo(cx+5,y-19); ctx.closePath(); ctx.fill();
-  font(9,'600'); ctx.fillStyle = '#dff7ff';
-  ctx.fillText(pad(hd,3)+'°', cx, y-25);
+  ctx.beginPath(); ctx.moveTo(m,cy); ctx.lineTo(m-7,cy-4); ctx.lineTo(m-7,cy+4); ctx.closePath(); ctx.fill();
+  font(7,'400'); ctx.fillStyle='rgba(111,230,255,.5)';
+  ctx.fillText('高度 m', m, cy+half+13);
   ctx.textAlign = 'left';
   ctx.restore();
+}
+
+/* 全ウィジェットの統括 */
+function drawChrome(e, dt){
+  drawSideArcs(e);
+  drawBottomArc(e);
+  drawTop(e);
+  drawLeft(e);
+  drawRight(e);
+
+  const m = Math.max(20, W*0.042);
+  const fpW = Math.min(78, W*0.2), fpH = fpW*1.18;
+  drawFaceplate(e, W - m - fpW, H*0.60, fpW, fpH);
+  drawDial(e, m + 26, H*0.72, 21, '推力', (62+Math.sin(S.t)*8).toFixed(0)+'%');
+
+  updateLog(dt);
+  drawLog(e, m, H - Math.max(28, H*0.045));
 }
 
 const BOOT_LINES = [
@@ -735,12 +977,10 @@ function frame(now){
   else if(faces.length) S.tracks.length = 0;
 
   if(e > 0){
+    drawChrome(e, dt);
     if(!faces.length) drawMotionTargets(e);
     drawFaces(e);
     drawReticle(e);
-    drawTop(e);
-    drawLeft(e);
-    drawCompass(e);
   }
   drawVisor(Math.max(e,0.2));
   drawScan();
