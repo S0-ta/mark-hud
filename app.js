@@ -240,19 +240,20 @@ function drawVideo(){
   try{ ctx.drawImage(V, r.x, r.y, r.w, r.h); }catch(e){}
   ctx.restore();
 
-  ctx.fillStyle = 'rgba(4,26,40,.30)';
+  // 色調：青寄せ＋周辺減光（映像が潰れない範囲に抑える）
+  ctx.fillStyle = 'rgba(4,26,40,.15)';
   ctx.fillRect(0,0,W,H);
-  const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.24, W/2,H/2,Math.max(W,H)*0.72);
+  const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.42, W/2,H/2,Math.max(W,H)*0.75);
   vg.addColorStop(0,'rgba(0,0,0,0)');
-  vg.addColorStop(1,'rgba(0,8,14,.86)');
+  vg.addColorStop(1,'rgba(0,8,14,.55)');
   ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
 }
 
 function drawScan(){
   ctx.save();
-  ctx.globalAlpha = 0.06; ctx.fillStyle = CY;
+  ctx.globalAlpha = 0.045; ctx.fillStyle = CY;
   for(let y = (S.t*46)%4; y < H; y += 4) ctx.fillRect(0, y, W, 1);
-  ctx.globalAlpha = 0.10;
+  ctx.globalAlpha = 0.07;
   const sy = (S.t*0.34 % 1.6 - 0.3) * H;
   const g = ctx.createLinearGradient(0, sy-90, 0, sy+90);
   g.addColorStop(0,'rgba(111,230,255,0)');
@@ -262,9 +263,9 @@ function drawScan(){
   ctx.restore();
 }
 
+// バイザー開口（八角形）※beginPathは呼び出し側で行う（複合パス構築のため）
 function visorPath(inset, chamfer){
   const l = inset, r = W-inset, t = inset, b = H-inset, c = chamfer;
-  ctx.beginPath();
   ctx.moveTo(l+c, t); ctx.lineTo(r-c, t); ctx.lineTo(r, t+c);
   ctx.lineTo(r, b-c); ctx.lineTo(r-c, b); ctx.lineTo(l+c, b);
   ctx.lineTo(l, b-c); ctx.lineTo(l, t+c); ctx.closePath();
@@ -272,8 +273,10 @@ function visorPath(inset, chamfer){
 function drawVisor(e){
   const inset = Math.max(7, Math.min(W,H)*0.018);
   const ch = Math.min(W,H)*0.11;
+  // 外周だけを暗く（全画面矩形＋八角形の複合パスをevenoddで塗る）
   ctx.save();
-  ctx.beginPath(); ctx.rect(0,0,W,H);
+  ctx.beginPath();
+  ctx.rect(0,0,W,H);
   visorPath(inset, ch);
   ctx.fillStyle = 'rgba(2,7,11,.95)';
   ctx.fill('evenodd');
@@ -281,10 +284,10 @@ function drawVisor(e){
 
   ctx.save();
   ctx.globalAlpha = e;
-  ctx.strokeStyle = 'rgba(111,230,255,.5)'; ctx.lineWidth = 1;
-  visorPath(inset, ch); ctx.stroke();
-  ctx.strokeStyle = 'rgba(111,230,255,.13)'; ctx.lineWidth = 1;
-  visorPath(inset+7, ch-5); ctx.stroke();
+  ctx.strokeStyle = 'rgba(111,230,255,.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); visorPath(inset, ch); ctx.stroke();
+  ctx.strokeStyle = 'rgba(111,230,255,.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); visorPath(inset+7, ch-5); ctx.stroke();
   ctx.restore();
 }
 
