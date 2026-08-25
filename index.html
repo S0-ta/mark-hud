@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#04090E">
 <title>MARK HUD</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <video id="vid" playsinline muted autoplay></video>
@@ -24,11 +24,11 @@
 <div id="gate">
   <div id="core"><span></span></div>
   <h1>MARK HUD</h1>
-  <p>カメラ映像にヘルメット内部のインターフェースを重ねます。前面カメラで顔を捕捉し、輪郭・虹彩・データパネルを描画します。映像は端末内だけで処理され、どこにも送信されません。</p>
+  <p>カメラ映像にヘルメット内部のインターフェースを重ねます。顔を検出すると、その周囲だけを明るく残して他を減光します。映像は端末内だけで処理され、どこにも送信されません。</p>
   <button class="btn cta" id="bStart">起動する</button>
   <div id="err"></div>
 </div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
