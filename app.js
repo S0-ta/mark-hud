@@ -16,6 +16,20 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MP_CDN   = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
+const OVERLAY_SRC = 'hud-overlay.webp';
+let overlayImg = null, overlayOK = false;
+(function loadOverlay(){
+  const im = new Image();
+  im.decoding = 'async';
+  im.onload  = ()=>{ overlayImg = im; overlayOK = true; };
+  im.onerror = ()=>{ overlayOK = false; };
+  im.src = OVERLAY_SRC;
+})();
+
+// 顔以外を減光するためのオフスクリーン
+const dim = document.createElement('canvas');
+const dctx = dim.getContext('2d');
+
 let W = 0, H = 0, DPR = 1;
 const S = {
   running:false, bootT:0, t:0, facing:'user', sound:true, grade:true,
@@ -62,6 +76,7 @@ function resize(){
   W = window.innerWidth; H = window.innerHeight;
   C.width = Math.round(W*DPR); C.height = Math.round(H*DPR);
   C.style.width = W+'px'; C.style.height = H+'px';
+  dim.width = C.width; dim.height = C.height;
   ctx.setTransform(DPR,0,0,DPR,0,0);
 }
 addEventListener('resize', resize);
@@ -321,10 +336,6 @@ function drawVideo(){
   if(!S.grade) return;
   ctx.fillStyle = 'rgba(4,26,40,.08)';
   ctx.fillRect(0,0,W,H);
-  const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.5, W/2,H/2,Math.max(W,H)*0.78);
-  vg.addColorStop(0,'rgba(0,0,0,0)');
-  vg.addColorStop(1,'rgba(0,8,14,.34)');
-  ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
 }
 
 function drawScan(){
@@ -413,12 +424,10 @@ function drawFaces(e){
     const col = locked ? AM : CY;
     const a = e;
 
-    // 1) 顔メッシュ（間引いたテセレーション）
     ctx.globalAlpha = a*0.13*acq;
     ctx.strokeStyle = CY; ctx.lineWidth = 0.6;
     strokeConn(lm, CONN && CONN.tess, 6);
 
-    // 2) 輪郭線
     ctx.globalAlpha = a*0.85*acq;
     ctx.strokeStyle = CY; ctx.lineWidth = 1.2;
     strokeConn(lm, CONN && CONN.oval, 1);
@@ -429,7 +438,6 @@ function drawFaces(e){
     strokeConn(lm, CONN && CONN.browR, 1);
     strokeConn(lm, CONN && CONN.lips, 1);
 
-    // 3) 虹彩＋瞳マーカー
     ctx.strokeStyle = AM; ctx.lineWidth = 1.2;
     strokeConn(lm, CONN && CONN.irisL, 1);
     strokeConn(lm, CONN && CONN.irisR, 1);
@@ -444,7 +452,6 @@ function drawFaces(e){
       ctx.stroke();
     });
 
-    // 4) 捕捉スキャンライン
     if(!locked){
       const p = acq;
       ctx.globalAlpha = a*(1-p)*0.9;
@@ -453,7 +460,6 @@ function drawFaces(e){
       ctx.beginPath(); ctx.moveTo(x0-8, ly); ctx.lineTo(x1+8, ly); ctx.stroke();
     }
 
-    // 5) ロックブラケット
     const px = fw*0.16, py = fh*0.1;
     const L = x0-px, R2 = x1+px, T = y0-py*1.6, B = y1+py;
     const grow = lerp(1.25, 1, acq);
@@ -467,7 +473,6 @@ function drawFaces(e){
       ctx.stroke();
     });
 
-    // 6) 回転リング
     if(!REDUCED){
       const rr = Math.max(gR-gL, gB-gT)*0.62;
       ctx.globalAlpha = a*0.5;
@@ -481,7 +486,6 @@ function drawFaces(e){
       ctx.restore();
     }
 
-    // 7) データパネル＋引き出し線
     const m = faceMetrics(f);
     const right = cx < W/2;
     const px0 = right ? gR + 10 : gL - 10;
@@ -536,7 +540,53 @@ function drawMotionTargets(e){
   ctx.restore();
 }
 
-/* ================= 描画：ヘルメット内部UI ================= */
+/* 顔の周囲だけを残して減光する */
+function drawSpotlight(e){
+  dctx.setTransform(DPR,0,0,DPR,0,0);
+  dctx.clearRect(0,0,W,H);
+  dctx.fillStyle = 'rgba(0,5,10,' + (faces.length ? 0.76 : 0.5) + ')';
+  dctx.fillRect(0,0,W,H);
+  dctx.globalCompositeOperation = 'destination-out';
+  const holes = faces.length ? faces.map(f=>{
+    const ax = sx(f.minx), bx = sx(f.maxx);
+    const x0 = Math.min(ax,bx), x1 = Math.max(ax,bx);
+    const y0 = sy(f.miny), y1 = sy(f.maxy);
+    return { cx:(x0+x1)/2, cy:(y0+y1)/2, r: Math.max(x1-x0, y1-y0)*0.8 };
+  }) : [{ cx:W/2, cy:H/2, r:Math.min(W,H)*0.32 }];
+  for(const t of holes){
+    const R = t.r*2.0;
+    const g = dctx.createRadialGradient(t.cx,t.cy,t.r*0.5, t.cx,t.cy,R);
+    g.addColorStop(0,'rgba(0,0,0,1)');
+    g.addColorStop(0.55,'rgba(0,0,0,.82)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    dctx.fillStyle = g;
+    dctx.beginPath(); dctx.arc(t.cx,t.cy,R,0,6.284); dctx.fill();
+  }
+  dctx.globalCompositeOperation = 'source-over';
+
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha = e;
+  ctx.drawImage(dim, 0, 0);
+  ctx.restore();
+}
+
+/* 参照デザインのオーバーレイを加算合成 */
+function drawOverlay(e){
+  if(!overlayOK) return false;
+  const iw = overlayImg.width, ih = overlayImg.height;
+  // 左右のパネルが見切れないよう全体を収める（contain）
+  const s = Math.min(W/iw, H/ih);
+  const dw = iw*s, dh = ih*s;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = e*(0.88 + 0.07*Math.sin(S.t*1.1));
+  ctx.drawImage(overlayImg, (W-dw)/2, (H-dh)/2, dw, dh);
+  ctx.restore();
+  return true;
+}
+
+/* ================= 描画：ヘルメット内部UI（オーバーレイ非対応時の代替） ================= */
 
 function chamferBox(x, y, w, h, c){
   ctx.beginPath();
@@ -549,7 +599,6 @@ function chamferBox(x, y, w, h, c){
   ctx.closePath();
 }
 
-/* 左右の同心アーク：ヘルメット内壁の曲率を表現 */
 function drawSideArcs(e){
   const cyy = H*0.5;
   const sets = [ {ccx:-W*0.62, base:0}, {ccx:W+W*0.62, base:Math.PI} ];
@@ -583,7 +632,6 @@ function drawSideArcs(e){
   ctx.restore();
 }
 
-/* 下部の大アーク：セグメントゲージ */
 function drawBottomArc(e){
   const ccx = W/2, ccy = H + H*0.30, R = H*0.44;
   const c0 = -Math.PI/2;
@@ -615,7 +663,6 @@ function drawBottomArc(e){
   ctx.restore();
 }
 
-/* 上部の方位ルーラー */
 function drawTopRuler(e, y){
   const halfW = Math.min(W*0.36, 210);
   const cx = W/2;
@@ -645,7 +692,6 @@ function drawTopRuler(e, y){
   ctx.restore();
 }
 
-/* フェイスプレート状態ウィジェット */
 function drawFaceplate(e, x, y, w, h){
   ctx.save();
   ctx.globalAlpha = e*0.75;
@@ -698,7 +744,6 @@ function drawFaceplate(e, x, y, w, h){
   ctx.restore();
 }
 
-/* 円形ダイヤル */
 function drawDial(e, cx, cy, r, label, value){
   ctx.save();
   ctx.globalAlpha = e*0.5;
@@ -729,7 +774,6 @@ function drawDial(e, cx, cy, r, label, value){
   ctx.restore();
 }
 
-/* システムログ */
 const LOG_POOL = [
   'OPTICAL FEED  SYNC',
   'MESH SOLVER  ACTIVE',
@@ -762,7 +806,6 @@ function drawLog(e, x, yBottom){
   ctx.restore();
 }
 
-/* 中央レティクル */
 function drawReticle(e){
   const cx = W/2, cy = H/2;
   const R = Math.min(W,H)*0.145*(0.6+0.4*e);
@@ -812,7 +855,6 @@ function drawReticle(e){
   ctx.textAlign = 'left';
 }
 
-/* 上段テキスト */
 function drawTop(e){
   const y = Math.max(24, H*0.04) - (1-e)*24;
   const m = Math.max(22, W*0.045);
@@ -835,7 +877,6 @@ function drawTop(e){
   drawTopRuler(e, y+30);
 }
 
-/* 左：出力バー＋状態 */
 function drawLeft(e){
   const m = Math.max(20, W*0.042) - (1-e)*40;
   const top = H*0.32, h = H*0.26;
@@ -870,7 +911,6 @@ function drawLeft(e){
   ctx.restore();
 }
 
-/* 右：高度ラダー */
 function drawRight(e){
   const m = W - Math.max(20, W*0.042) + (1-e)*40;
   const cy = H*0.44, half = H*0.15;
@@ -896,8 +936,12 @@ function drawRight(e){
   ctx.restore();
 }
 
-/* 全ウィジェットの統括 */
 function drawChrome(e, dt){
+  if(overlayOK){
+    drawOverlay(e);
+    drawTop(e);
+    return;
+  }
   drawSideArcs(e);
   drawBottomArc(e);
   drawTop(e);
@@ -975,6 +1019,8 @@ function frame(now){
   detectFaces(now);
   if(!faces.length && (++motionSkip % 2 === 0)) updateTracks(detectMotion(), dt*2);
   else if(faces.length) S.tracks.length = 0;
+
+  drawSpotlight(Math.max(e, 0.35));
 
   if(e > 0){
     drawChrome(e, dt);
