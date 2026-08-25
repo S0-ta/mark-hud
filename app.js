@@ -16,15 +16,17 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MP_CDN   = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
-const OVERLAY_SRC = 'hud-overlay.webp';
+// 端末からのアップロードで名前が変わることがあるため候補を順に試す
+const OVERLAY_CANDIDATES = ['hud-overlay.webp', 'IMG_0012.webp'];
 let overlayImg = null, overlayOK = false;
-(function loadOverlay(){
+(function loadOverlay(i){
+  if(i >= OVERLAY_CANDIDATES.length) return;
   const im = new Image();
   im.decoding = 'async';
   im.onload  = ()=>{ overlayImg = im; overlayOK = true; };
-  im.onerror = ()=>{ overlayOK = false; };
-  im.src = OVERLAY_SRC;
-})();
+  im.onerror = ()=>{ loadOverlay(i+1); };
+  im.src = OVERLAY_CANDIDATES[i];
+})(0);
 
 // 顔以外を減光するためのオフスクリーン
 const dim = document.createElement('canvas');
@@ -586,7 +588,7 @@ function drawOverlay(e){
   return true;
 }
 
-/* ================= 描画：ヘルメット内部UI（オーバーレイ非対応時の代替） ================= */
+/* ========== 描画：ヘルメット内部UI（オーバーレイ非対応時の代替） ========== */
 
 function chamferBox(x, y, w, h, c){
   ctx.beginPath();
